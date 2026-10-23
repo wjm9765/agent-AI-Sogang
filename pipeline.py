@@ -26,7 +26,10 @@ def judge(
 ) -> dict:
     """Parser 결과 + 사용자 정보로 토론과 최종 판정을 만든다."""
     step = on_step or (lambda message: None)
-    history = run_debate(doc, persona, turns or load_config()["debate"]["turns"], step)
+    turns = load_config()["debate"]["turns"] if turns is None else turns
+    if turns < 1:
+        raise ValueError("토론 턴 수는 1 이상이어야 합니다.")
+    history = run_debate(doc, persona, turns, step)
     step("Writer: 최종 판정")
     report = write_report(doc, persona, history)
     return {"debate_history": history, "report": report.model_dump()}
@@ -47,8 +50,12 @@ def main() -> None:
     args = ap.parse_args()
 
     cases = load_cases(args.path) if args.path.suffix.lower() == ".zip" else [load_case(args.path)]
-    if args.case:
+    if args.case is not None:
+        if not 1 <= args.case <= len(cases):
+            ap.error(f"--case는 1~{len(cases)} 범위여야 합니다.")
         cases = [cases[args.case - 1]]
+    if args.turns is not None and args.turns < 1:
+        ap.error("--turns는 1 이상이어야 합니다.")
     output_dir = Path(load_config()["parser"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -56,7 +63,7 @@ def main() -> None:
         print(f"▶ {case.name}", flush=True)
         try:
             result = run_case(case, args.turns, lambda message: print(f"  · {message}", flush=True))
-        except Exception as e:  # 한 케이스가 실패해도 나머지는 계속
+        except Exception as e:  # noqa: BLE001 - 한 케이스가 실패해도 나머지는 계속
             print(f"  실패: {type(e).__name__}: {e}", flush=True)
             continue
         path = output_dir / f"{_safe_name(case.name)}.result.json"

@@ -34,7 +34,7 @@ def read_pdf(path: Path) -> list[Page]:
         for number, page in enumerate(pdf.pages, start=1):
             tables = page.find_tables()
             bboxes = [t.bbox for t in tables]
-            body = page.filter(lambda obj: not _inside_any(obj, bboxes))
+            body = page.filter(lambda obj, bboxes=bboxes: not _inside_any(obj, bboxes))
             blocks = [(line["top"], line["text"]) for line in body.extract_text_lines()]
             blocks += [(t.bbox[1], _table_to_markdown(t.extract())) for t in tables]
             blocks.sort(key=lambda block: block[0])

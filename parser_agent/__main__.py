@@ -37,7 +37,7 @@ def main() -> None:
             print(f"▶ {case.name}", flush=True)
             try:
                 save(output_dir / f"{_safe_name(case.name)}.parsed.json", parse_notice(case))
-            except Exception as e:  # 한 케이스가 실패해도 나머지는 계속
+            except Exception as e:  # noqa: BLE001 - 한 케이스가 실패해도 나머지는 계속
                 print(f"  실패: {type(e).__name__}: {e}", flush=True)
     else:
         ap.error(f"지원하지 않는 형식입니다: {suffix}")

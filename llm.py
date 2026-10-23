@@ -8,16 +8,14 @@ import os
 import threading
 from functools import cache
 from pathlib import Path
-from typing import TypeVar
 
 import yaml
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parent
-T = TypeVar("T", bound=BaseModel)
 
 
 @cache
@@ -35,6 +33,11 @@ _client_key: str | None = None
 _client_lock = threading.Lock()
 
 
+def get_api_key() -> str | None:
+    """배포 환경(Cloud Secrets)이 로컬 .env보다 우선한다. 키를 로그에 남기지 않는다."""
+    return os.getenv("GEMINI_API_KEY") or dotenv_values(ROOT / ".env").get("GEMINI_API_KEY")
+
+
 def get_client() -> genai.Client:
     """Client는 키마다 하나만 만들어 계속 쓴다. .env의 키가 바뀌면 새로 만든다(Streamlit 재시작 없이 반영).
 
@@ -42,10 +45,9 @@ def get_client() -> genai.Client:
     """
     global _client, _client_key
     with _client_lock:
-        load_dotenv(ROOT / ".env", override=True)
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = get_api_key()
         if not api_key:
-            raise RuntimeError("GEMINI_API_KEY가 없습니다. .env.example을 복사해 .env를 만들고 키를 넣으세요.")
+            raise RuntimeError("GEMINI_API_KEY가 없습니다. 로컬 .env 또는 Streamlit Cloud Secrets에 키를 설정하세요.")
         if _client is None or api_key != _client_key:
             _client_key = api_key
             # 503(과부하) 같은 서버 쪽 일시 오류만 재시도한다. 429(할당량 초과)는 기다려도 안 풀리므로 바로 실패시킨다.
@@ -54,7 +56,7 @@ def get_client() -> genai.Client:
         return _client
 
 
-def generate_json(schema: type[T], contents: str, system_instruction: str) -> T:
+def generate_json[T: BaseModel](schema: type[T], contents: str, system_instruction: str) -> T:
     """structured output으로 한 번 호출하고 응답을 schema로 검증해 돌려준다."""
     response = get_client().models.generate_content(
         model=get_model(),

@@ -97,6 +97,8 @@ def summarize(pages: list[Page], pdf_path: Path | None = None) -> StructuredSumm
 
 
 def _references(response: types.GenerateContentResponse) -> list[str]:
+    if not response.candidates:
+        return []
     candidate = response.candidates[0]
     urls = []
     if candidate.url_context_metadata:

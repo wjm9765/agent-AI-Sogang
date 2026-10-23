@@ -1,0 +1,49 @@
+/* 공고핏: restrained document workspace, with native accessible Streamlit controls. */
+:root { --ink: #1f302d; --muted: #687a74; --line: #dce4dd; --green: #167d71; }
+.stApp { background: #f6f7f4; }
+.stMainBlockContainer { max-width: 1300px; padding: 4.5rem 3rem 1rem; }
+.brand-bar { display:flex; justify-content:space-between; align-items:center; padding-bottom:22px; border-bottom:1px solid var(--line); }
+.brand { display:flex; align-items:center; gap:10px; color:var(--ink); font-size:23px; font-weight:800; letter-spacing:-1px; }
+.brand-icon { display:inline-flex; width:31px; height:34px; align-items:center; justify-content:center; border-radius:9px 9px 9px 2px; background:var(--green); color:white; font-size:20px; }
+.brand-en { margin-left:6px; font-size:10px; letter-spacing:1.8px; color:var(--muted); font-weight:600; }
+.brand-meta { font-size:12px; color:var(--muted); }
+.hero { padding:42px 0 25px; }
+.eyebrow { font-size:10px; font-weight:700; letter-spacing:2px; color:var(--green); }
+.hero h1 { margin:12px 0; padding:0; font-size:clamp(30px,3.3vw,46px); line-height:1.3; font-weight:800; letter-spacing:-2px; color:var(--ink); }
+.hero h1 span { color:var(--green); }
+.hero p { color:var(--muted); font-size:15px; line-height:1.8; margin:12px 0 0; }
+.mobile-break { display:none; }
+.workflow { display:flex; align-items:center; gap:24px; margin-bottom:25px; padding:17px 22px; background:#eaf0e9; border:1px solid #e0e8dd; border-radius:12px; color:#4c625a; font-size:12px; }
+.workflow b { color:var(--green); margin-right:8px; font-size:11px; }
+.workflow i { color:#9faf9f; font-style:normal; }
+.st-key-input_card { padding:1.2rem; border:1px solid var(--line); background:#fff; border-radius:16px; }
+[data-testid="stFileUploaderDropzone"] { border:1px dashed #b9ccc2; border-radius:12px; background:#f8faf6; }
+h3 { font-size:19px!important; font-weight:750!important; letter-spacing:-.5px; }
+h4 { font-size:16px!important; }
+[data-testid="stCaptionContainer"] { color:var(--muted); line-height:1.65; }
+[data-testid="stTextArea"] textarea { font-size:14px; line-height:1.7; border-radius:10px; }
+.stButton button[kind="primary"] { min-height:48px; border-radius:10px; font-size:14px; font-weight:700; }
+[data-testid="stTabs"] button { font-size:13px; }
+.empty-state { min-height:494px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px 18px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(145deg,#fcfdfa,#f0f4ec); }
+.document-mark { position:relative; display:flex; align-items:center; justify-content:center; width:66px; height:80px; margin:0 0 27px; border:1px solid #b6cbc0; border-radius:10px 18px 10px 10px; background:#fff; color:#87a194; font-size:25px; box-shadow:6px 6px 0 #e0e9dd; }
+.document-mark span { position:absolute; bottom:-8px; right:-12px; display:flex; align-items:center; justify-content:center; height:28px; width:28px; background:var(--green); color:white; border:3px solid #f2f6ed; border-radius:50%; font-size:14px; }
+.empty-state h2 { margin:14px 0 10px; padding:0; font-size:27px; font-weight:750; letter-spacing:-1px; line-height:1.5; color:var(--ink); }
+.empty-state p { font-size:13px; color:var(--muted); line-height:1.9; }
+.result-tags { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:10px; }
+.result-tags span { padding:6px 11px; border:1px solid #d7e1d5; border-radius:20px; background:#fff9; color:#567164; font-size:11px; }
+.empty-note { margin-top:32px; font-size:11px; color:#7d8c82; }
+.footer { display:flex; justify-content:space-between; gap:15px; margin-top:42px; padding:20px 0 5px; border-top:1px solid var(--line); color:#7e8b83; font-size:10px; letter-spacing:.3px; }
+@media(max-width:750px) {
+ .stMainBlockContainer { padding:4.5rem 1rem 1rem; }
+ .brand-meta { display:none; }
+ .brand-en { font-size:9px; }
+ .hero { padding:30px 0 23px; }
+ .hero h1 { font-size:31px; letter-spacing:-1.4px; }
+ .hero p { font-size:13px; }
+ .mobile-break { display:block; }
+ .workflow { gap:10px; padding:14px 11px; font-size:10px; justify-content:space-between; }
+ .workflow b { margin-right:4px; font-size:9px; }
+ .empty-state { min-height:410px; }
+ .empty-state h2 { font-size:24px; }
+ .footer { flex-direction:column; gap:8px; margin-top:25px; }
+}

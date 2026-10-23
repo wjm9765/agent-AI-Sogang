@@ -14,7 +14,7 @@ class WriterOutput(BaseModel):
         description="GO=지원 권장, HOLD=보완 후 지원(보류), STOP=비추천·신청 불가"
     )
     verdict_label: str = Field(description="판정 한 줄. 예: '[신청 불가 / 수공기간 미달]'")
-    confidence_score: int = Field(description="판정 확신도 0~100")
+    confidence_score: int = Field(ge=0, le=100, description="판정 확신도 0~100")
     summary: str = Field(description="두괄식 2~4문장. 첫 문장에 최종 판정을 선언")
     key_reasons: list[str] = Field(description="판정 핵심 근거. 공고 근거 포함")
     warnings: list[str] = Field(description="놓치면 탈락·불이익인 기한·서류·자격 요건")

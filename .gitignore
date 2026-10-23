@@ -1,0 +1,30 @@
+# 비밀 값 (.env.example만 커밋)
+.env
+.env.*
+!.env.example
+
+# 가상환경 (uv)
+.venv/
+
+# Python 캐시·빌드 산출물
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# 실행 결과물
+outputs/
+debate_result_for_writer.json
+*.log
+
+# OS·에디터
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

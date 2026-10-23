@@ -36,9 +36,35 @@ Web search는 문서 밖의 최신 정보를 확인할 때 씁니다. 예: 일�
 
 ## LLM
 
-- **Gemini** 사용. 모델명은 아직 확정되지 않았으므로 코드에 하드코딩하지 않고 환경변수 `GEMINI_MODEL`로 받습니다.
-- API 키는 `GEMINI_API_KEY` 환경변수(`.env`)로 관리하고 **절대 커밋하지 않습니다.**
+- **Gemini** 사용. 모든 에이전트가 **같은 모델 하나**를 쓰고, 모델명은 `config.yaml`의 `llm.model`에서만 바꿉니다. 코드에 하드코딩하지 않습니다.
+- API 키는 `.env`의 `GEMINI_API_KEY`로 관리하고 **절대 커밋하지 않습니다.** (`.env.example` 참고)
+- 현재 모델은 `gemini-3.8-flash`. Parser가 Google 검색 도구를 쓰므로 유료 키가 필요합니다(무료 키는 gemini-3.x 검색이 429).
+- 클라이언트와 모델명은 `llm.py`의 `get_client()`, `get_model()`로 가져옵니다.
 - 에이전트 하나 = 시스템 프롬프트 + tool(function call) 정의 + 입출력 JSON 스키마.
+
+## 개발 환경
+
+[uv](https://docs.astral.sh/uv/)로 가상환경(`.venv`)과 의존성을 관리합니다. `pip install`이나 `requirements.txt` 대신 `uv`를 씁니다.
+
+```bash
+uv sync                    # .venv 생성 + 의존성 설치 (Python 3.12)
+cp .env.example .env       # .env에 GEMINI_API_KEY 입력
+uv add <패키지>             # 의존성 추가 → pyproject.toml, uv.lock 같이 커밋
+uv run python -m parser_agent 데이터셋.zip   # Parser CLI
+uv run python pipeline.py 데이터셋.zip --case 1   # 전체 파이프라인 CLI
+uv run streamlit run app.py                 # 전체 UI (판정까지)
+```
+
+## 테스트 데이터
+
+`데이터셋.zip` 안의 `.txt` 6개. 각 파일 = 공고명 + 출처 링크 + 사용자 상황(Persona) + 이상적인 답(Ideal Answer). 공고문 본문은 없고 출처 링크만 있습니다.
+
+```python
+from dataset import load_cases
+cases = load_cases("데이터셋.zip")   # case.notice_title, case.source_url, case.persona, case.ideal_answer
+```
+
+`ideal_answer`는 평가용 정답이므로 에이전트 입력에 넣지 않습니다.
 
 ## 할 일
 

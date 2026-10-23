@@ -1,99 +1,106 @@
 # Parser
 
-담당: wjm · 브랜치: `feature/parser` · 상태: 개요 초안
+담당: wjm · 브랜치: `feature/parser` · 상태: 최소 구현 (PDF → ParsedDocument JSON)
 
 ## 역할
 
-공문서 파일을 읽어 뒤의 에이전트(Pro, Critique, Writer)가 쓸 수 있는 **구조화된 JSON**으로 바꿉니다.
+공문서 파일을 읽어 뒤의 에이전트(Pro, Critique, Writer)가 쓸 수 있는 **구조화된 JSON**(`ParsedDocument`)으로 바꿉니다.
 
 - 문서에 적힌 **사실만** 추출합니다. 추천 여부 판단은 하지 않습니다(Pro, Critique의 일).
 - 사용자 정보는 받지 않습니다. 같은 문서는 사용자와 관계없이 같은 결과가 나와야 합니다.
 - 모든 추출 항목에 원문 인용(`evidence`)을 붙여 Critique가 Pro 의견을 원문과 대조할 수 있게 합니다.
 
+## 실행
+
+```bash
+uv run python -m parser_agent 데이터셋.zip           # 6개 케이스 → outputs/데이터셋 N ....parsed.json
+uv run python -m parser_agent "데이터셋 1 ....txt"    # 케이스 하나
+uv run python -m parser_agent 공고문.pdf             # PDF → outputs/공고문.parsed.json
+uv run python -m parser_agent 공고문.pdf --no-llm    # LLM 없이 raw_chunks만 출력 (파일 읽기 확인용)
+uv run streamlit run app.py                          # UI: 업로드 → 케이스 선택 → 분석 (판정까지)
+```
+
+코드에서 쓸 때:
+
+```python
+from dataset import load_cases
+from parser_agent.agent import parse_document, parse_notice
+
+doc = parse_notice(load_cases("데이터셋.zip")[0])   # 데이터셋 케이스 (출처 링크)
+doc = parse_document("공고문.pdf")                  # PDF
+doc.model_dump()                                    # dict
+```
+
+## 데이터셋 입력 (출처 링크)
+
+데이터셋 `.txt`에는 공고문 본문이 없고 출처 링크만 있습니다. 출처 페이지를 직접 긁으면 메뉴만 나오거나(서울시), 본문이 첨부 `.hwpx`에 있거나(중기부), JS로 그려져 비어 있어서(u300) 쓸 수 없습니다. 그래서 `fetch_notice()`가 **Gemini의 URL 읽기 + Google 검색 도구**로 공고문 내용을 모은 뒤, 아래 구조화 단계에 넘깁니다. 내용을 가져온 URL은 `source.references`에 남습니다.
+
 ## 처리 흐름
 
-1. **파일 읽기** (Python, LLM 없음)
-   - **`.pdf` (주 형식)**: `pdfplumber` 등으로 페이지별 본문 텍스트와 표를 추출합니다. 페이지 번호를 같이 남겨 `evidence`에 쓸 수 있게 합니다.
-   - **스캔본 PDF**(텍스트 레이어 없음)는 추출 결과가 비어 있습니다. 이 경우 PDF 파일을 Gemini에 직접 입력하거나(Gemini는 PDF 입력 지원) OCR로 대체합니다.
-   - **`.hwpx`**: ZIP 파일입니다. 압축을 풀고 `Contents/section*.xml`에서 본문 텍스트(`<hp:t>`)와 표(`<hp:tbl>` → `<hp:tr>` → `<hp:tc>`)를 추출합니다.
-   - 표는 신청 자격·일정이 자주 들어가므로 텍스트로 뭉개지 말고 행/열 구조를 유지합니다(예: Markdown 표로 변환).
-   - `.hwp`(바이너리) 지원 여부는 추후 결정합니다.
-2. **구조화** (Gemini)
-   - 1단계 결과를 프롬프트에 넣고, 아래 출력 스키마에 맞춘 JSON을 받습니다(structured output).
-3. **외부 확인** (선택, web search)
-   - 일정이 공휴일과 겹치는지, 공고가 변경·취소됐는지 등을 확인합니다.
-   - 결과는 `external_checks`에만 기록하고 원문에서 뽑은 값을 덮어쓰지 않습니다.
+| 단계 | 코드 | 내용 |
+|---|---|---|
+| 1. 파일 읽기 (LLM 없음) | `parser_agent/reader.py` | `pdfplumber`로 페이지별 본문 줄과 표를 추출. 표는 Markdown으로 바꿔 페이지 안 원래 위치에 끼워 넣음 |
+| 2. 원문 조각 | `reader.split_chunks` | 조항·항목 제목 줄(`제3조(지원자격)`, `Ⅱ.`, `1.`, `□` 등)이나 페이지가 바뀔 때마다 끊어 `raw_chunks` 생성 |
+| 3. 구조화 (Gemini) | `parser_agent/agent.py` | 페이지 표시(`[p.N]`)를 붙인 본문을 넣고 `StructuredSummary` 스키마로 JSON 출력(structured output) |
 
-## 입력 / 출력
+- **스캔본 PDF**(텍스트 레이어 없음)는 1단계 결과가 비어 있으므로 PDF 파일을 Gemini에 그대로 넣습니다. 이때 `raw_chunks`는 비어 있습니다(OCR은 추후).
+- `.hwpx`, `.hwp`는 아직 지원하지 않습니다.
 
-**입력**: 문서 파일 경로
+## 출력: `ParsedDocument`
 
-**출력** (초안, Pro·Critique 담당과 협의해서 확정):
+스키마 정의는 `parser_agent/schema.py`에 있습니다. Pro·Critique README의 요구사항(`structured_summary`, `raw_chunks`에 `page`·`section`·`text`)에 맞췄습니다.
 
 ```json
 {
-  "source": { "file_name": "공고문.pdf", "format": "pdf", "pages": 4 },
-  "title": "공고 제목",
-  "issuer": "발행 기관",
-  "issued_date": "YYYY-MM-DD",
-  "summary": "문서 요약 (3문장 이내)",
-  "eligibility": [
-    { "condition": "만 19~34세 청년", "evidence": "원문 인용" }
-  ],
-  "benefits": [
-    { "item": "월 50만원 지원", "evidence": "원문 인용" }
-  ],
-  "schedule": [
-    { "event": "신청 기간", "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "evidence": "원문 인용" }
-  ],
-  "how_to_apply": { "method": "온라인 신청", "evidence": "원문 인용" },
-  "required_documents": [
-    { "item": "주민등록등본", "evidence": "원문 인용" }
-  ],
-  "contact": { "value": "담당 부서 / 전화번호", "evidence": "원문 인용" },
-  "external_checks": [
-    { "query": "검색어", "finding": "확인한 내용", "source_url": "https://..." }
-  ],
-  "missing_fields": ["문서에서 찾지 못한 항목명"]
+  "source": { "file_name": "공고문.pdf", "format": "pdf", "pages": 2 },
+  "structured_summary": {
+    "title": "2026년 청년 창업 지원사업 모집 공고",
+    "issuer": "서울특별시 경제진흥원",
+    "issued_date": "2026-10-01",
+    "summary": "문서 요약 (3문장 이내)",
+    "eligibility":        [{ "content": "만 19~39세 대표자, 업력 3년 이내", "evidence": "p.1: 제2조(지원자격) ..." }],
+    "benefits":           [{ "content": "...", "evidence": "p.2: ..." }],
+    "schedule":           [{ "event": "신청 접수", "start": "2026-10-06", "end": "2026-10-25 18:00", "evidence": "p.2: ..." }],
+    "how_to_apply":       [{ "content": "...", "evidence": "..." }],
+    "required_documents": [{ "content": "...", "evidence": "..." }],
+    "cautions":           [{ "content": "국세·지방세 체납 기업 제외 (신청일 전 완납 시 예외)", "evidence": "p.1: ..." }],
+    "contact":            [{ "content": "...", "evidence": "..." }],
+    "missing_fields": ["문서에서 찾지 못한 항목명"]
+  },
+  "raw_chunks": [
+    { "chunk_id": "c002", "page": 1, "section": "제2조(지원자격)", "text": "원문 그대로" }
+  ]
 }
 ```
 
-- 문서에 없는 값은 추측하지 않고 `null`로 두고 `missing_fields`에 적습니다.
-- 날짜는 `YYYY-MM-DD`, 시간은 `HH:MM`(24시간)으로 통일합니다.
-- PDF는 `evidence` 원문 인용 앞에 페이지를 붙입니다(예: `"p.2: 신청 기간은 ..."`).
+- `structured_summary`: LLM이 채우는 요약. 문서에 없는 값은 `null` 또는 빈 목록, 항목명은 `missing_fields`에 기록.
+- `cautions`: 지원 제외 대상, 실격·감점 사유, 별표·각주·단서 조항. 요약에서 빠지기 쉬워 따로 모읍니다(Critique 리스크 검토용).
+- `raw_chunks`: LLM을 거치지 않은 원문 그대로의 조각. Pro·Critique의 원문 검색(`lookup_raw_clause`)과 페이지 인용에 씁니다.
+- 날짜는 `YYYY-MM-DD`, 시간이 있으면 `YYYY-MM-DD HH:MM`.
+
+## 프롬프트
+
+`parser_agent/agent.py`의 `SYSTEM_PROMPT`를 기준으로 합니다. 요지:
+
+1. 문서에 적힌 사실만 추출, 추측 금지
+2. 모든 항목에 `"p.N: 원문"` 형태의 근거 인용
+3. 없는 항목은 `null`/빈 목록 + `missing_fields`
+4. 날짜 형식 통일, 연도 생략 시 발행일 기준
+5. 제외·실격·단서 조항은 빠짐없이 `cautions`에
+6. 추천 여부는 판단하지 않음
 
 ## Tool
 
-| 이름 | 종류 | 설명 | 구현 |
+| 이름 | 종류 | 설명 | 상태 |
 |---|---|---|---|
-| `read_document(path)` | Python 함수 | 파일을 읽어 페이지별 텍스트 + 표 반환. LLM 호출 전에 Parser가 직접 실행 | PDF: `pdfplumber` 등 / hwpx: `zipfile`, `xml` |
-| `web_search(query)` | LLM tool (function call) | 문서 밖 최신 정보 확인 | Gemini 내장 Google Search 또는 외부 검색 API (미정) |
-
-## 프롬프트 (초안)
-
-```
-너는 한국 공문서(공고문, 안내문 등)를 읽고 구조화된 데이터로 정리하는 Parser 에이전트다.
-
-규칙:
-1. 문서에 적힌 사실만 추출한다. 추측하거나 일반 상식으로 빈칸을 채우지 않는다.
-2. 모든 항목에 근거가 되는 원문 문장을 evidence로 그대로 인용한다. 페이지 정보가 있으면 "p.2: 원문" 형태로 앞에 붙인다.
-3. 문서에서 찾을 수 없는 항목은 null로 두고 missing_fields에 항목명을 적는다.
-4. 날짜는 YYYY-MM-DD, 시간은 HH:MM(24시간)으로 통일한다. 연도가 생략된 날짜는 문서 발행일 기준으로 해석한다.
-5. 이 문서가 누구에게 맞는지, 추천할지는 판단하지 않는다. 그것은 다음 에이전트의 일이다.
-6. 일정이 공휴일과 겹치거나 변경·취소 가능성이 보이면 web_search로 확인하고, 결과는 external_checks에만 기록한다. 원문에서 뽑은 값을 검색 결과로 덮어쓰지 않는다.
-7. 주어진 JSON 스키마에 맞춰서만 출력한다.
-
-<document>
-{document_text}
-</document>
-```
+| `read_document(path)` | Python 함수 | 파일을 읽어 페이지별 텍스트 + 표 반환. LLM 호출 전에 실행 | 구현 (PDF) |
+| `web_search(query)` | LLM tool | 공휴일·일정 변경 등 문서 밖 정보 확인 | 미구현. Critique가 Google Search를 쓰므로 Parser에 필요한지 협의 |
 
 ## 미정 사항
 
-- Gemini 모델명
-- PDF 처리 방식 (Python으로 텍스트·표 추출 후 전달 vs PDF를 Gemini에 직접 전달)
-- 스캔본 PDF 대응 (Gemini 직접 입력 vs OCR)
-- `.hwp`(바이너리)도 지원할지
-- web search 방식 (Gemini 내장 Google Search vs 별도 검색 API)
-- 대상 문서 종류 (공고문만? 일반 공문 전체?)
+- Gemini 모델명 확정 (현재 `gemini-3.8-flash`, 유료 키 필요)
+- 첨부 hwpx에만 본문이 있는 공고(데이터셋 3번 등)는 가져온 내용이 빈약함
+- 스캔본 PDF의 `raw_chunks` 생성 (OCR 또는 Gemini로 원문 추출)
+- `.hwpx`, `.hwp` 지원 여부
+- Parser에 web search가 필요한지 (Critique와 역할 겹침)
 - 출력 스키마 확정 (Pro, Critique 담당과 협의)

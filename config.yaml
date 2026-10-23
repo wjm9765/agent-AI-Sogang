@@ -1,0 +1,9 @@
+# 모든 에이전트가 같은 모델 하나를 쓴다. 모델을 바꿀 때는 여기만 고친다.
+llm:
+  model: gemini-3.8-flash
+
+parser:
+  output_dir: outputs
+
+debate:
+  turns: 2  # Pro ↔ Critique 왕복 횟수. 1로 줄이면 호출이 2번 줄어 빨라진다.
